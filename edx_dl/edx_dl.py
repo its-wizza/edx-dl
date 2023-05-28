@@ -106,6 +106,7 @@ DASHBOARD = BASE_URL + '/dashboard'
 COURSEWARE_SEL = OPENEDX_SITES['edx']['courseware-selector']
 LEARNER_INIT_API = BASE_URL + '/api/learner_home/init'
 COURSE_OUTLINE_API = BASE_URL + '/api/course_home/outline/'
+COURSEWARE_SEQUENCE_API = BASE_URL + '/api/courseware/sequence/'
 
 
 def change_openedx_site(site_name):
@@ -119,6 +120,7 @@ def change_openedx_site(site_name):
     global COURSEWARE_SEL
     global LEARNER_INIT_API
     global COURSE_OUTLINE_API
+    global COURSEWARE_SEQUENCE_API
 
     sites = sorted(OPENEDX_SITES.keys())
     if site_name not in sites:
@@ -132,6 +134,7 @@ def change_openedx_site(site_name):
     COURSEWARE_SEL = OPENEDX_SITES[site_name]['courseware-selector']
     LEARNER_INIT_API = BASE_URL + '/api/learner_home/init'
     COURSE_OUTLINE_API = BASE_URL + '/api/course_home/outline/'
+    COURSEWARE_SEQUENCE_API = BASE_URL + '/api/courseware/sequence/'
 
 
 def _display_courses(courses):
@@ -1033,20 +1036,19 @@ def main():
     # Parse the sections and build the selections dict filtered by sections
     try:
         # Try using edX API first
-        r = re.compile(r'/([^/]+\+.*\+.*)/')
         all_selections = {selected_course:
-                          get_available_sections(COURSE_OUTLINE_API + re.search(r, selected_course.url).group(1),
+                          get_available_sections(selected_course.api_url,
                                                  headers)
                           for selected_course in selected_courses}
-    except HTTPError:
+    except (HTTPError, AttributeError) as e:
         # Otherwise use original (non-working?) method
         course_str = 'course'
         if args.platform != 'edx':
             course_str = 'courseware'
 
         all_selections = {selected_course:
-                              get_available_sections(selected_course.url.replace('info', course_str),
-                                                     headers)
+                          get_available_sections(selected_course.url.replace('info', course_str),
+                                                 headers)
                           for selected_course in selected_courses}
 
     selections = parse_sections(args, all_selections)
@@ -1055,10 +1057,18 @@ def main():
     # Extract the unit information (downloadable resources)
     # This parses the HTML of all the subsection.url and extracts
     # the URLs of the resources as Units.
-    all_urls = [subsection.url
-                for selected_sections in selections.values()
-                for selected_section in selected_sections
-                for subsection in selected_section.subsections]
+    try:
+        # Try using edX API first
+        all_urls = [subsection.api_url
+                    for selected_sections in selections.values()
+                    for selected_section in selected_sections
+                    for subsection in selected_section.subsections]
+    except (HTTPError, AttributeError) as e:
+        # Otherwise use original (non-working?) method
+        all_urls = [subsection.url
+                    for selected_sections in selections.values()
+                    for selected_section in selected_sections
+                    for subsection in selected_section.subsections]
 
     extractor = extract_all_units_in_parallel
     if args.sequential:

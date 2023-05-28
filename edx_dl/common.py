@@ -31,6 +31,7 @@ In the script the data structures used are:
 4. The units can contain multiple videos:
    Unit -> [Video]
 """
+import re
 
 
 class Course(object):
@@ -65,6 +66,35 @@ class Course(object):
         return self.name + ": " + url
 
 
+class ApiCourse(Course):
+    """
+    Api Course class represents course information, includes API URL.
+    """
+    def __init__(self, id, name, url, api_url, state):
+        """
+        @param id: The id of a course in edX is composed by the path
+            {organization}/{course_number}/{course_run}
+        @type id: str or None
+
+        @param name: Name of the course. The name is taken from course page
+            h3 header.
+        @type name: str
+
+        @param url: URL of the course.
+        @type url: str or None
+
+        @param api_url: API URL of the course.
+        @type api_url: str or None
+
+        @param state: State of the course. One of the following values:
+            * 'Not yet'
+            * 'Started'
+        @type state: str
+        """
+        self.api_url = api_url
+        super().__init__(id, name, url, state)
+
+
 class Section(object):
     """
     Representation of a section of the course.
@@ -91,6 +121,33 @@ class Section(object):
         self.subsections = subsections
 
 
+class ApiSection(Section):
+    """
+    Representation of a section of the course, includes API URL.
+    """
+    def __init__(self, position, name, url, api_url, subsections):
+        """
+        @param position: Integer position of the section in the list of
+            sections. Starts at 1.
+        @type position: int
+
+        @param name: Name of the section.
+        @type name: str
+
+        @param url: URL of the section. None when section contains no
+            subsections.
+        @type url: str or None
+
+        @param api_url: API URL of the section.
+        @type api_url: str or None
+
+        @param subsections: List of subsections.
+        @type subsections: [SubSection]
+        """
+        self.api_url = api_url
+        super().__init__(position, name, url, subsections)
+
+
 class SubSection(object):
     """
     Representation of a subsection in a section.
@@ -113,6 +170,29 @@ class SubSection(object):
 
     def __repr__(self):
         return self.name + ": " + self.url
+
+
+class ApiSubSection(SubSection):
+    """
+    Representation of a subsection in a section.
+    """
+    def __init__(self, position, name, url, api_url):
+        """
+        @param position: Integer position of the subsection in the subsection
+            list. Starts at 1.
+        @type position: int
+
+        @param name: Name of the subsection.
+        @type name: str
+
+        @param url: URL of the subsection.
+        @type url: str
+
+        @param api_url: API URL of the subsection.
+        @type api_url: str
+        """
+        self.api_url = api_url
+        super().__init__(position, name, url)
 
 class Unit(object):
     """

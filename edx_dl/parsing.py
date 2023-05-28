@@ -11,7 +11,7 @@ from datetime import timedelta, datetime
 from six.moves import html_parser
 from bs4 import BeautifulSoup as BeautifulSoup_
 
-from .common import Course, Section, SubSection, Unit, Video
+from .common import Course, ApiCourse, Section, ApiSection, SubSection, ApiSubSection, Unit, Video
 
 # Force use of bs4 with html.parser
 BeautifulSoup = lambda page: BeautifulSoup_(page, 'html.parser')
@@ -414,6 +414,39 @@ class NewEdXPageExtractor(CurrentEdXPageExtractor):
 
 
 class ApiEdXPageExtractor(PageExtractor):
+    """
+    Page extractor for to use edX API rather than HTML scraping
+    """
+
+    def extract_unit(self, text, BASE_URL, file_formats):
+        re_metadata = re.compile(r'data-metadata=&#39;(.*?)&#39;')
+        videos = []
+        match_metadatas = re_metadata.findall(text)
+        for match_metadata in match_metadatas:
+            metadata = html_parser.HTMLParser().unescape(match_metadata)
+            metadata = json.loads(html_parser.HTMLParser().unescape(metadata))
+            video_youtube_url = None
+            re_video_speed = re.compile(r'1.0\d+\:(?:.*?)(.{11})')
+            match_video_youtube_url = re_video_speed.search(metadata['streams'])
+            if match_video_youtube_url is not None:
+                video_id = match_video_youtube_url.group(1)
+                video_youtube_url = 'https://youtube.com/watch?v=' + video_id
+            # notice that the concrete languages come now in
+            # so we can eventually build the full urls here
+            # subtitles_download_urls = {sub_lang:
+            #                            BASE_URL + metadata['transcriptTranslationUrl'].replace('__lang__', sub_lang)
+            #                            for sub_lang in metadata['transcriptLanguages'].keys()}
+            available_subs_url = BASE_URL + metadata['transcriptAvailableTranslationsUrl']
+            sub_template_url = BASE_URL + metadata['transcriptTranslationUrl'].replace('__lang__', '%s')
+            mp4_urls = [url for url in metadata['sources'] if url.endswith('.mp4')]
+            videos.append(Video(video_youtube_url=video_youtube_url,
+                                available_subs_url=available_subs_url,
+                                sub_template_url=sub_template_url,
+                                mp4_urls=mp4_urls))
+
+        resources_urls = self.extract_resources_urls(text, BASE_URL,
+                                                     file_formats)
+        return Unit(videos=videos, resources_urls=resources_urls)
 
     def extract_units_from_html(self, page, BASE_URL, file_formats):
         pass
@@ -431,23 +464,24 @@ class ApiEdXPageExtractor(PageExtractor):
                                     and block['id'] in chapter['children']]
             except AttributeError:
                 return []
-            subsections = [SubSection(position=i,
-                                      url=s['lms_web_url'],
-                                      name=s['display_name'])
+            subsections = [ApiSubSection(position=i,
+                                         url=s['lms_web_url'],
+                                         api_url=BASE_URL + '/api/courseware/sequence/' + s['id'],
+                                         name=s['display_name'])
                            for i, s in enumerate(sequentials_dict, 1)]
 
             return subsections
-
 
         outline_json = json.loads(page)
         chapters_dict = [block
                          for block in outline_json['course_blocks']['blocks'].values()
                          if block['type'] == 'chapter']
 
-        sections = [Section(position=i,
-                            name=chapter['display_name'],
-                            url=chapter['lms_web_url'],
-                            subsections=_make_subsections(chapter))
+        sections = [ApiSection(position=i,
+                               name=chapter['display_name'],
+                               url=chapter['lms_web_url'],
+                               api_url=BASE_URL + '/api/courseware/sequence/' + chapter['id'],
+                               subsections=_make_subsections(chapter))
                     for i, chapter in enumerate(chapters_dict, 1)]
         # Filter out those sections for which name could not be parsed
         sections = [section for section in sections
@@ -473,10 +507,12 @@ class ApiEdXPageExtractor(PageExtractor):
                 course_state = 'Started'
             else:
                 course_state = 'Not yet'
-            courses.append(Course(id=course_id,
-                                  name=course_name,
-                                  url=course_url,
-                                  state=course_state))
+            course_api_url = BASE_URL + '/api/course_home/outline/' + course_id
+            courses.append(ApiCourse(id=course_id,
+                                     name=course_name,
+                                     url=course_url,
+                                     api_url=course_api_url,
+                                     state=course_state))
 
         return courses
 
