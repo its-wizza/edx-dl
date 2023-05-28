@@ -93,6 +93,10 @@ OPENEDX_SITES = {
     'bits':{
         'url':'http://any-learn.bits-pilani.ac.in',
         'courseware-selector': ('nav', {'aria-label': 'Course Navigation'}),
+    },
+    'home': {
+        'url': 'https://home.edx.org/',
+        'courseware-selector': ('nav', {'aria-label': 'Course Navigation'}),
     }
 }
 BASE_URL = OPENEDX_SITES['edx']['url']
@@ -100,6 +104,7 @@ EDX_HOMEPAGE = BASE_URL + '/user_api/v1/account/login_session'
 LOGIN_API = BASE_URL + '/login_ajax'
 DASHBOARD = BASE_URL + '/dashboard'
 COURSEWARE_SEL = OPENEDX_SITES['edx']['courseware-selector']
+LEARNER_INIT_API = BASE_URL + '/api/learner_home/ini'
 
 
 def change_openedx_site(site_name):
@@ -111,6 +116,7 @@ def change_openedx_site(site_name):
     global LOGIN_API
     global DASHBOARD
     global COURSEWARE_SEL
+    global LEARNER_INIT_API
 
     sites = sorted(OPENEDX_SITES.keys())
     if site_name not in sites:
@@ -122,6 +128,7 @@ def change_openedx_site(site_name):
     LOGIN_API = BASE_URL + '/login_ajax'
     DASHBOARD = BASE_URL + '/dashboard'
     COURSEWARE_SEL = OPENEDX_SITES[site_name]['courseware-selector']
+    LEARNER_INIT_API = BASE_URL + '/api/learner_home/ini'
 
 
 def _display_courses(courses):
@@ -1011,7 +1018,12 @@ def main():
         exit(ExitCode.WRONG_EMAIL_OR_PASSWORD)
 
     # Parse and select the available courses
-    courses = get_courses_info(DASHBOARD, headers)
+    try:
+        # Try using edX API first
+        courses = get_courses_info(LEARNER_INIT_API, headers)
+    except HTTPError:
+        # Otherwise use original (non-working?) method
+        courses = get_courses_info(DASHBOARD, headers)
     available_courses = [course for course in courses if course.state == 'Started']
     selected_courses = parse_courses(args, available_courses)
 

@@ -424,6 +424,8 @@ def get_page_extractor(url):
     """
     factory method for page extractors
     """
+    if '/api/' in url:
+        return ApiEdXPageExtractor()
     if (
         url.startswith('https://courses.edx.org') or
         url.startswith('https://mitxpro.mit.edu')
