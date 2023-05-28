@@ -417,7 +417,29 @@ class ApiEdXPageExtractor(PageExtractor):
         pass
 
     def extract_courses_from_html(self, page, BASE_URL):
-        pass
+        """
+        Extracts courses (Course) from the JSON page
+        """
+        init_json = json.loads(page)
+
+        # API gives us JSON file, easy to work with
+
+        courses = []
+
+        for course in init_json['courses']:
+            course_id = course['courseRun']['courseId']
+            course_name = course['course']['courseName']
+            course_url = course['courseRun']['homeUrl']
+            if course['enrollment']['hasStarted']:
+                course_state = 'Started'
+            else:
+                course_state = 'Not yet'
+            courses.append(Course(id=course_id,
+                                  name=course_name,
+                                  url=course_url,
+                                  state=course_state))
+
+        return courses
 
 
 def get_page_extractor(url):
