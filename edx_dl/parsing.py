@@ -13,7 +13,6 @@ from bs4 import BeautifulSoup as BeautifulSoup_
 
 from .common import Course, Section, SubSection, Unit, Video
 
-
 # Force use of bs4 with html.parser
 BeautifulSoup = lambda page: BeautifulSoup_(page, 'html.parser')
 
@@ -34,11 +33,11 @@ def edx_json2srt(o):
 
         output.append(str(i) + '\n')
 
-        s = base_time + timedelta(seconds=s/1000.)
-        e = base_time + timedelta(seconds=e/1000.)
+        s = base_time + timedelta(seconds=s / 1000.)
+        e = base_time + timedelta(seconds=e / 1000.)
         time_range = "%02d:%02d:%02d,%03d --> %02d:%02d:%02d,%03d\n" % \
-                     (s.hour, s.minute, s.second, s.microsecond/1000,
-                      e.hour, e.minute, e.second, e.microsecond/1000)
+                     (s.hour, s.minute, s.second, s.microsecond / 1000,
+                      e.hour, e.minute, e.second, e.microsecond / 1000)
 
         output.append(time_range)
         output.append(t + "\n\n")
@@ -144,7 +143,7 @@ class ClassicEdXPageExtractor(PageExtractor):
                 sub_template_url = BASE_URL + match_subs.group(1) + "/%s"
 
         else:
-            re_available_subs_url=re.compile(r'href=(?:&#34;|")([^"&]+)(?:&#34;|")&gt;Download transcript&lt;')
+            re_available_subs_url = re.compile(r'href=(?:&#34;|")([^"&]+)(?:&#34;|")&gt;Download transcript&lt;')
             match_available_subs = re_available_subs_url.search(text)
             if match_available_subs:
                 sub_template_url = BASE_URL + match_available_subs.group(1)
@@ -184,7 +183,8 @@ class ClassicEdXPageExtractor(PageExtractor):
 
         # we match links to youtube videos as <a href> and add them to the
         # download list
-        re_youtube_links = re.compile(r'&lt;a href=(?:&#34;|")(https?\:\/\/(?:www\.)?(?:youtube\.com|youtu\.?be)\/.*?)(?:&#34;|")')
+        re_youtube_links = re.compile(
+            r'&lt;a href=(?:&#34;|")(https?\:\/\/(?:www\.)?(?:youtube\.com|youtu\.?be)\/.*?)(?:&#34;|")')
         youtube_links = re_youtube_links.findall(text)
         resources_urls += youtube_links
 
@@ -194,6 +194,7 @@ class ClassicEdXPageExtractor(PageExtractor):
         """
         Extract sections (Section->SubSection) from the html page
         """
+
         def _make_url(section_soup):  # FIXME: Extract from here and test
             try:
                 return BASE_URL + section_soup.ul.a['href']
@@ -215,7 +216,7 @@ class ClassicEdXPageExtractor(PageExtractor):
             # FIXME correct extraction of subsection.name (unicode)
             subsections = [SubSection(position=i,
                                       url=BASE_URL + s.a['href'],
-                                      name=s.p.get_text().replace('current section',''))
+                                      name=s.p.get_text().replace('current section', ''))
                            for i, s in enumerate(subsections_soup, 1)]
 
             return subsections
@@ -264,7 +265,8 @@ class ClassicEdXPageExtractor(PageExtractor):
             try:
                 # started courses include the course link in the href attribute
                 course_url = BASE_URL + course_soup.a['href']
-                if course_url.endswith('info') or course_url.endswith('info/') or course_url.endswith('course') or course_url.endswith('course/'):
+                if course_url.endswith('info') or course_url.endswith('info/') or course_url.endswith(
+                        'course') or course_url.endswith('course/'):
                     course_state = 'Started'
                 # The id of a course in edX is composed by the path
                 # {organization}/{course_number}/{course_run}
@@ -283,6 +285,7 @@ class CurrentEdXPageExtractor(ClassicEdXPageExtractor):
     """
     A new page extractor for the recent changes in layout of edx
     """
+
     def extract_unit(self, text, BASE_URL, file_formats):
         re_metadata = re.compile(r'data-metadata=&#39;(.*?)&#39;')
         videos = []
@@ -317,6 +320,7 @@ class CurrentEdXPageExtractor(ClassicEdXPageExtractor):
         """
         Extract sections (Section->SubSection) from the html page
         """
+
         def _make_url(section_soup):  # FIXME: Extract from here and test
             try:
                 return BASE_URL + section_soup.div.div.a['href']
@@ -326,7 +330,7 @@ class CurrentEdXPageExtractor(ClassicEdXPageExtractor):
 
         def _get_section_name(section_soup):  # FIXME: Extract from here and test
             try:
-                return section_soup['aria-label'][:-8] # -8 cuts the submenu word
+                return section_soup['aria-label'][:-8]  # -8 cuts the submenu word
             except AttributeError:
                 return None
 
@@ -367,6 +371,7 @@ class NewEdXPageExtractor(CurrentEdXPageExtractor):
         """
         Extract sections (Section->SubSection) from the html page
         """
+
         def _make_url(section_soup):  # FIXME: Extract from here and test
             try:
                 return section_soup.a['href']
@@ -394,7 +399,7 @@ class NewEdXPageExtractor(CurrentEdXPageExtractor):
             return subsections
 
         soup = BeautifulSoup(page)
-        sections_soup = soup.find_all('li', class_=['outline-item','section'])
+        sections_soup = soup.find_all('li', class_=['outline-item', 'section'])
 
         sections = [Section(position=i,
                             name=_get_section_name(section_soup),
@@ -414,7 +419,41 @@ class ApiEdXPageExtractor(PageExtractor):
         pass
 
     def extract_sections_from_html(self, page, BASE_URL):
-        pass
+        """
+        Extract sections (Section->SubSection) from the html page
+        """
+
+        def _make_subsections(chapter):
+            try:
+                sequentials_dict = [block
+                                    for block in outline_json['course_blocks']['blocks'].values()
+                                    if block['type'] == 'sequential'
+                                    and block['id'] in chapter['children']]
+            except AttributeError:
+                return []
+            subsections = [SubSection(position=i,
+                                      url=s['lms_web_url'],
+                                      name=s['display_name'])
+                           for i, s in enumerate(sequentials_dict, 1)]
+
+            return subsections
+
+
+        outline_json = json.loads(page)
+        chapters_dict = [block
+                         for block in outline_json['course_blocks']['blocks'].values()
+                         if block['type'] == 'chapter']
+
+        sections = [Section(position=i,
+                            name=chapter['display_name'],
+                            url=chapter['lms_web_url'],
+                            subsections=_make_subsections(chapter))
+                    for i, chapter in enumerate(chapters_dict, 1)]
+        # Filter out those sections for which name could not be parsed
+        sections = [section for section in sections
+                    if section.name]
+
+        return sections
 
     def extract_courses_from_html(self, page, BASE_URL):
         """
@@ -449,14 +488,14 @@ def get_page_extractor(url):
     if '/api/' in url:
         return ApiEdXPageExtractor()
     if (
-        url.startswith('https://courses.edx.org') or
-        url.startswith('https://mitxpro.mit.edu')
+            url.startswith('https://courses.edx.org') or
+            url.startswith('https://mitxpro.mit.edu')
     ):
         return NewEdXPageExtractor()
     elif (
-        url.startswith('https://edge.edx.org') or
-        url.startswith('https://lagunita.stanford.edu') or
-        url.startswith('https://www.fun-mooc.fr')
+            url.startswith('https://edge.edx.org') or
+            url.startswith('https://lagunita.stanford.edu') or
+            url.startswith('https://www.fun-mooc.fr')
     ):
         return NewEdXPageExtractor()
     else:
