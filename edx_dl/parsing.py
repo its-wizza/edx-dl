@@ -408,6 +408,18 @@ class NewEdXPageExtractor(CurrentEdXPageExtractor):
         return sections
 
 
+class ApiEdXPageExtractor(PageExtractor):
+
+    def extract_units_from_html(self, page, BASE_URL, file_formats):
+        pass
+
+    def extract_sections_from_html(self, page, BASE_URL):
+        pass
+
+    def extract_courses_from_html(self, page, BASE_URL):
+        pass
+
+
 def get_page_extractor(url):
     """
     factory method for page extractors
