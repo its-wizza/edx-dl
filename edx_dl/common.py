@@ -38,6 +38,7 @@ class Course(object):
     """
     Course class represents course information.
     """
+
     def __init__(self, id, name, url, state):
         """
         @param id: The id of a course in edX is composed by the path
@@ -70,6 +71,7 @@ class ApiCourse(Course):
     """
     Api Course class represents course information, includes API URL.
     """
+
     def __init__(self, id, name, url, api_url, state):
         """
         @param id: The id of a course in edX is composed by the path
@@ -99,6 +101,7 @@ class Section(object):
     """
     Representation of a section of the course.
     """
+
     def __init__(self, position, name, url, subsections):
         """
         @param position: Integer position of the section in the list of
@@ -125,6 +128,7 @@ class ApiSection(Section):
     """
     Representation of a section of the course, includes API URL.
     """
+
     def __init__(self, position, name, url, api_url, subsections):
         """
         @param position: Integer position of the section in the list of
@@ -152,6 +156,7 @@ class SubSection(object):
     """
     Representation of a subsection in a section.
     """
+
     def __init__(self, position, name, url):
         """
         @param position: Integer position of the subsection in the subsection
@@ -176,6 +181,7 @@ class ApiSubSection(SubSection):
     """
     Representation of a subsection in a section.
     """
+
     def __init__(self, position, name, url, api_url):
         """
         @param position: Integer position of the subsection in the subsection
@@ -194,10 +200,12 @@ class ApiSubSection(SubSection):
         self.api_url = api_url
         super().__init__(position, name, url)
 
+
 class Unit(object):
     """
     Representation of a single unit of the course.
     """
+
     def __init__(self, videos, resources_urls):
         """
         @param videos: List of videos present in the unit.
@@ -216,8 +224,9 @@ class Video(object):
     """
     Representation of a single video.
     """
-    def __init__(self, video_youtube_url, subtitles_download_urls=None,
-                 sub_template_url=None, available_subs_url=None, mp4_urls=None):
+
+    def __init__(self, video_youtube_url, available_subs_url,
+                 sub_template_url, mp4_urls):
         """
         @param video_youtube_url: Youtube link (if any).
         @type video_youtube_url: str or None
@@ -232,7 +241,6 @@ class Video(object):
         @type mp4_urls: [str]
         """
         self.video_youtube_url = video_youtube_url
-        self.subtitles_download_urls = subtitles_download_urls
         self.available_subs_url = available_subs_url
         self.sub_template_url = sub_template_url
         self.mp4_urls = mp4_urls

@@ -44,11 +44,11 @@ def execute_command(cmd, args):
             raise e
 
 
-def directory_name(initial_name):
+def directory_name(initial_name, minimal_dir_format):
     """
     Transform the name of a directory into an ascii version
     """
-    result = clean_filename(initial_name)
+    result = clean_filename(initial_name, minimal_dir_format)
     return result if result != "" else "course_folder"
 
 
@@ -129,7 +129,7 @@ def clean_filename(s, minimal_change=False):
 
     # strip paren portions which contain trailing time length (...)
     s = (
-        s.replace(': ', '-')
+        s.replace(': ', ' - ')
         .replace(':', '-')
         .replace('/', '-')
         .replace('\x00', '-')

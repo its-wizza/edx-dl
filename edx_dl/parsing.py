@@ -438,14 +438,15 @@ class ApiEdXPageExtractor(NewEdXPageExtractor):
             if match_video_youtube_url is not None:
                 video_id = match_video_youtube_url.group(1)
                 video_youtube_url = 'https://youtube.com/watch?v=' + video_id
-            subtitles_download_urls = {sub_lang:
-                                       BASE_URL + metadata['transcriptTranslationUrl'].replace('__lang__', sub_lang)
-                                       for sub_lang in metadata['transcriptLanguages'].keys()}
+            # notice that the concrete languages come now in
+            # so we can eventually build the full urls here
+            # subtitles_download_urls = {sub_lang:
+            #                            BASE_URL + metadata['transcriptTranslationUrl'].replace('__lang__', sub_lang)
+            #                            for sub_lang in metadata['transcriptLanguages'].keys()}
             available_subs_url = BASE_URL + metadata['transcriptAvailableTranslationsUrl']
             sub_template_url = BASE_URL + metadata['transcriptTranslationUrl'].replace('__lang__', '%s')
             mp4_urls = [url for url in metadata['sources'] if url.endswith('.mp4')]
             videos.append(Video(video_youtube_url=video_youtube_url,
-                                subtitles_download_urls=subtitles_download_urls,
                                 available_subs_url=available_subs_url,
                                 sub_template_url=sub_template_url,
                                 mp4_urls=mp4_urls))

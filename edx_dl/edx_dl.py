@@ -211,9 +211,17 @@ def edx_get_subtitle(url, headers,
     """
     try:
         if ';' in url:  # non-JSON format (e.g. Stanford)
-            return get_page_contents(url, headers)
+            try:
+                # Not sure why, but passing headers causes 403 Error
+                return get_page_contents(url, {})
+            except HTTPError:
+                return get_page_contents(url, headers)
         else:
-            json_object = get_page_contents_as_json(url, headers)
+            try:
+                # Not sure why, but passing headers causes 403 Error
+                json_object = get_page_contents_as_json(url, {})
+            except HTTPError:
+                json_object = get_page_contents_as_json(url, headers)
             return edx_json2srt(json_object)
     except URLError as exception:
         logging.warn('edX subtitles (error: %s)', exception)
@@ -374,6 +382,12 @@ def parse_args():
                         default=False,
                         help='if active overwrites the file formats to be '
                         'extracted')
+
+    parser.add_argument('--minimal-dir-format',
+                        dest='minimal_dir_format',
+                        action='store_true',
+                        default=False,
+                        help='leaves directory names with similar format to chapter names (no underscores)')
 
     parser.add_argument('--cache',
                         dest='cache',
@@ -636,22 +650,18 @@ def get_subtitles_urls(available_subs_url, sub_template_url, headers):
     """
     if available_subs_url is not None and sub_template_url is not None:
         try:
-            available_subs = get_page_contents_as_json(available_subs_url,
-                                                       headers)
+            try:
+                # Not sure why, but passing headers causes 403 Error
+                available_subs = get_page_contents_as_json(available_subs_url,
+                                                           {})
+            except HTTPError:
+                available_subs = get_page_contents_as_json(available_subs_url,
+                                                           headers)
         except HTTPError:
-            available_subs = ['en']
+            return {}
 
         return {sub_lang: sub_template_url % sub_lang
                 for sub_lang in available_subs}
-
-    elif sub_template_url is not None:
-        try:
-            available_subs = get_page_contents(sub_template_url,
-                                                       headers)
-        except HTTPError:
-            available_subs = ['en']
-
-        return {'en': sub_template_url}
 
     return {}
 
@@ -679,12 +689,9 @@ def _build_subtitles_downloads(video, target_dir, filename_prefix, headers):
     if match_subtitle:
         filename = match_subtitle.group(1)
 
-    # Use new method to get subtitles URLs if possible
-    subtitles_download_urls = video.subtitles_download_urls
-    if not subtitles_download_urls:
-        subtitles_download_urls = get_subtitles_urls(video.available_subs_url,
-                                                     video.sub_template_url,
-                                                     headers)
+    subtitles_download_urls = get_subtitles_urls(video.available_subs_url,
+                                                 video.sub_template_url,
+                                                 headers)
     for sub_lang, sub_url in subtitles_download_urls.items():
         subs_filename = os.path.join(target_dir,
                                      filename + '.' + sub_lang + '.srt')
@@ -845,7 +852,7 @@ def download_unit(unit, args, target_dir, filename_prefix, headers):
     skip_or_download(res_downloads, headers, args)
 
 
-def download(args, selections, all_units, headers):
+def download(args, selections, all_units, headers, minimal_dir_format):
     """
     Downloads all the resources based on the selections
     """
@@ -856,12 +863,12 @@ def download(args, selections, all_units, headers):
     # sections/subsections to add correct prefixes and show nicer information.
 
     for selected_course, selected_sections in selections.items():
-        coursename = directory_name(selected_course.name)
+        coursename = directory_name(selected_course.name, minimal_dir_format)
         for selected_section in selected_sections:
             section_dirname = "%02d-%s" % (selected_section.position,
                                            selected_section.name)
             target_dir = os.path.join(args.output_dir, coursename,
-                                      clean_filename(section_dirname))
+                                      clean_filename(section_dirname, minimal_dir_format))
             mkdir_p(target_dir)
             counter = 0
             for subsection in selected_section.subsections:
@@ -1115,7 +1122,7 @@ def main():
         urls = extract_urls_from_units(filtered_units, args.export_format)
         save_urls_to_file(urls, args.export_filename)
     else:
-        download(args, selections, filtered_units, headers)
+        download(args, selections, filtered_units, headers, args.minimal_dir_format)
 
 
 if __name__ == '__main__':
