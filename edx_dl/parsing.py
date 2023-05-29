@@ -3,8 +3,10 @@
 """
 Parsing and extraction functions
 """
+import html
 import re
 import json
+import sys
 
 from datetime import timedelta, datetime
 
@@ -12,6 +14,7 @@ from six.moves import html_parser
 from bs4 import BeautifulSoup as BeautifulSoup_
 
 from .common import Course, ApiCourse, Section, ApiSection, SubSection, ApiSubSection, Unit, Video
+from .utils import get_page_contents
 
 # Force use of bs4 with html.parser
 BeautifulSoup = lambda page: BeautifulSoup_(page, 'html.parser')
@@ -413,33 +416,36 @@ class NewEdXPageExtractor(CurrentEdXPageExtractor):
         return sections
 
 
-class ApiEdXPageExtractor(PageExtractor):
+class ApiEdXPageExtractor(NewEdXPageExtractor):
     """
     Page extractor for to use edX API rather than HTML scraping
     """
 
     def extract_unit(self, text, BASE_URL, file_formats):
-        re_metadata = re.compile(r'data-metadata=&#39;(.*?)&#39;')
+        re_metadata = re.compile(r"data-metadata='(.*?)'")
         videos = []
         match_metadatas = re_metadata.findall(text)
         for match_metadata in match_metadatas:
-            metadata = html_parser.HTMLParser().unescape(match_metadata)
-            metadata = json.loads(html_parser.HTMLParser().unescape(metadata))
+            if sys.version_info < (3, 4):
+                metadata = html_parser.HTMLParser().unescape(match_metadata)
+                metadata = json.loads(html_parser.HTMLParser().unescape(metadata))
+            else:
+                metadata = html.unescape(match_metadata)
+                metadata = json.loads(html.unescape(metadata))
             video_youtube_url = None
             re_video_speed = re.compile(r'1.0\d+\:(?:.*?)(.{11})')
             match_video_youtube_url = re_video_speed.search(metadata['streams'])
             if match_video_youtube_url is not None:
                 video_id = match_video_youtube_url.group(1)
                 video_youtube_url = 'https://youtube.com/watch?v=' + video_id
-            # notice that the concrete languages come now in
-            # so we can eventually build the full urls here
-            # subtitles_download_urls = {sub_lang:
-            #                            BASE_URL + metadata['transcriptTranslationUrl'].replace('__lang__', sub_lang)
-            #                            for sub_lang in metadata['transcriptLanguages'].keys()}
+            subtitles_download_urls = {sub_lang:
+                                       BASE_URL + metadata['transcriptTranslationUrl'].replace('__lang__', sub_lang)
+                                       for sub_lang in metadata['transcriptLanguages'].keys()}
             available_subs_url = BASE_URL + metadata['transcriptAvailableTranslationsUrl']
             sub_template_url = BASE_URL + metadata['transcriptTranslationUrl'].replace('__lang__', '%s')
             mp4_urls = [url for url in metadata['sources'] if url.endswith('.mp4')]
             videos.append(Video(video_youtube_url=video_youtube_url,
+                                subtitles_download_urls=subtitles_download_urls,
                                 available_subs_url=available_subs_url,
                                 sub_template_url=sub_template_url,
                                 mp4_urls=mp4_urls))
@@ -448,8 +454,50 @@ class ApiEdXPageExtractor(PageExtractor):
                                                      file_formats)
         return Unit(videos=videos, resources_urls=resources_urls)
 
-    def extract_units_from_html(self, page, BASE_URL, file_formats):
-        pass
+    def extract_units_from_html_with_headers(self, page, BASE_URL, file_formats, headers):
+        """
+        Extract Units from the html of a subsection webpage as a list of
+        resources
+        """
+        sequence_json = json.loads(page)
+        units_url = [BASE_URL + '/xblock/' + item['id']
+                     for item in sequence_json['items']]
+
+        units_html = (get_page_contents(url, headers)
+                      for url in units_url)
+
+        units = []
+
+        for unit_html in units_html:
+            unit = self.extract_unit(unit_html, BASE_URL, file_formats)
+            if len(unit.videos) > 0 or len(unit.resources_urls) > 0:
+                units.append(unit)
+        return units
+
+    def extract_resources_urls(self, text, BASE_URL, file_formats):
+        """
+        Extract resources looking for <a> references in the webpage and
+        matching the given file formats
+        """
+        formats = '|'.join(file_formats)
+        re_resources_urls = re.compile(r'<a href=(?:&#34;|")([^"&]*.(?:' + formats + '))(?:&#34;|")')
+        resources_urls = []
+        for url in re_resources_urls.findall(text):
+            if url.startswith('http') or url.startswith('https'):
+                resources_urls.append(url)
+            elif url.startswith('//'):
+                resources_urls.append('https:' + url)
+            else:
+                resources_urls.append(BASE_URL + url)
+
+        # we match links to youtube videos as <a href> and add them to the
+        # download list
+        re_youtube_links = re.compile(
+            r'<a href=(?:&#34;|")(https?\:\/\/(?:www\.)?(?:youtube\.com|youtu\.?be)\/.*?)(?:&#34;|")')
+        youtube_links = re_youtube_links.findall(text)
+        resources_urls += youtube_links
+
+        return resources_urls
 
     def extract_sections_from_html(self, page, BASE_URL):
         """

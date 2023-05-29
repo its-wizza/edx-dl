@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import html
+import sys
 
 # This module contains generic functions, ideally useful to any other module
 from six.moves.urllib.request import urlopen, Request
@@ -119,12 +121,16 @@ def clean_filename(s, minimal_change=False):
     """
 
     # First, deal with URL encoded strings
-    h = html_parser.HTMLParser()
-    s = h.unescape(s)
+    if sys.version_info < (3, 4):
+        h = html_parser.HTMLParser()
+        s = h.unescape(s)
+    else:
+        s = html.unescape(s)
 
     # strip paren portions which contain trailing time length (...)
     s = (
-        s.replace(':', '-')
+        s.replace(': ', '-')
+        .replace(':', '-')
         .replace('/', '-')
         .replace('\x00', '-')
         .replace('\n', '')

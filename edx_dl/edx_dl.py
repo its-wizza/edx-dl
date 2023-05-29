@@ -33,7 +33,7 @@ from six.moves.urllib.request import (
 from ._version import __version__
 
 from .common import (
-    YOUTUBE_DL_CMD,
+    YT_DLP_CMD,
     DEFAULT_CACHE_FILENAME,
     Unit,
     Video,
@@ -43,7 +43,7 @@ from .common import (
 from .parsing import (
     edx_json2srt,
     get_page_extractor,
-    is_youtube_url,
+    is_youtube_url
 )
 from .utils import (
     clean_filename,
@@ -259,7 +259,7 @@ def parse_args():
                         action='store',
                         default=[],
                         help='target course urls '
-                        '(e.g., https://courses.edx.org/courses/BerkeleyX/CS191x/2013_Spring/info)')
+                        '(e.g., https://learning.edx.org/course/course-v1:edX+edx201+1T2020/home)')
 
     # optional
     parser.add_argument('-u',
@@ -455,7 +455,12 @@ def extract_units(url, headers, file_formats):
 
     page = get_page_contents(url, headers)
     page_extractor = get_page_extractor(url)
-    units = page_extractor.extract_units_from_html(page, BASE_URL, file_formats)
+    try:
+        # Try using edX API first
+        units = page_extractor.extract_units_from_html_with_headers(page, BASE_URL, file_formats, headers)
+    except AttributeError:
+        # Otherwise use original (non-working?) method
+        units = page_extractor.extract_units_from_html(page, BASE_URL, file_formats)
 
     return units
 
@@ -674,9 +679,12 @@ def _build_subtitles_downloads(video, target_dir, filename_prefix, headers):
     if match_subtitle:
         filename = match_subtitle.group(1)
 
-    subtitles_download_urls = get_subtitles_urls(video.available_subs_url,
-                                                 video.sub_template_url,
-                                                 headers)
+    # Use new method to get subtitles URLs if possible
+    subtitles_download_urls = video.subtitles_download_urls
+    if not subtitles_download_urls:
+        subtitles_download_urls = get_subtitles_urls(video.available_subs_url,
+                                                     video.sub_template_url,
+                                                     headers)
     for sub_lang, sub_url in subtitles_download_urls.items():
         subs_filename = os.path.join(target_dir,
                                      filename + '.' + sub_lang + '.srt')
@@ -757,7 +765,9 @@ def download_youtube_url(url, filename, headers, args):
     """
     logging.info('Downloading video with URL %s from YouTube.', url)
     video_format_option = args.format + '/mp4' if args.format else 'mp4'
-    cmd = YOUTUBE_DL_CMD + ['-o', filename, '-f', video_format_option]
+    # Use yt-dlp fork rather than broken youtube-dl
+    cmd = YT_DLP_CMD + ['-o', filename, '-f', video_format_option]
+    # cmd = YOUTUBE_DL_CMD + ['-o', filename, '-f', video_format_option]
 
     if args.subtitles:
         cmd.append('--all-subs')
@@ -855,7 +865,10 @@ def download(args, selections, all_units, headers):
             mkdir_p(target_dir)
             counter = 0
             for subsection in selected_section.subsections:
-                units = all_units.get(subsection.url, [])
+                try:
+                    units = all_units.get(subsection.api_url, [])
+                except (HTTPError, AttributeError) as e:
+                    units = all_units.get(subsection.url, [])
                 for unit in units:
                     counter += 1
                     filename_prefix = "%02d" % counter

@@ -216,8 +216,8 @@ class Video(object):
     """
     Representation of a single video.
     """
-    def __init__(self, video_youtube_url, available_subs_url,
-                 sub_template_url, mp4_urls):
+    def __init__(self, video_youtube_url, subtitles_download_urls=None,
+                 sub_template_url=None, available_subs_url=None, mp4_urls=None):
         """
         @param video_youtube_url: Youtube link (if any).
         @type video_youtube_url: str or None
@@ -232,6 +232,7 @@ class Video(object):
         @type mp4_urls: [str]
         """
         self.video_youtube_url = video_youtube_url
+        self.subtitles_download_urls = subtitles_download_urls
         self.available_subs_url = available_subs_url
         self.sub_template_url = sub_template_url
         self.mp4_urls = mp4_urls
@@ -251,6 +252,7 @@ class ExitCode(object):
 
 
 YOUTUBE_DL_CMD = ['youtube-dl', '--ignore-config']
+YT_DLP_CMD = ['yt-dlp', '--ignore-config']
 DEFAULT_CACHE_FILENAME = 'edx-dl.cache'
 DEFAULT_FILE_FORMATS = ['e?ps', 'pdf', 'txt', 'doc', 'xls', 'ppt',
                         'docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp', 'odg',
